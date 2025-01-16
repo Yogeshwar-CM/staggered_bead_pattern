@@ -122,5 +122,10 @@ def index():
 def uploaded_file(filename):
     return send_file(os.path.join(UPLOAD_FOLDER, filename), mimetype="image/png")
 
+def handler(event, context):
+    from flask import request, jsonify
+    with app.test_request_context(event['path'], method=event['httpMethod']):
+        return app.full_dispatch_request()
+
 if __name__ == "__main__":
     app.run(debug=True)
