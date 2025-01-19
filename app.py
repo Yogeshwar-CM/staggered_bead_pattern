@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -11,6 +12,12 @@ matplotlib.use("Agg")
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def clear_uploads():
+    """Delete all files in the uploads folder before processing a new image."""
+    if os.path.exists(UPLOAD_FOLDER):
+        shutil.rmtree(UPLOAD_FOLDER)  # Delete folder and contents
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Recreate empty folder
 
 def load_image(image_path, grid_width, grid_height):
     """Load and resize the image to fit the bead grid."""
@@ -64,6 +71,8 @@ def draw_staggered_grid(img_array, bead_size, gap=2):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        clear_uploads()  # Clear the uploads folder before processing new image
+
         image_file = request.files.get("image")
         grid_width = request.form.get("grid_width", type=int)
         grid_height = request.form.get("grid_height", type=int)
@@ -97,22 +106,15 @@ def index():
         plt.savefig(output_path, bbox_inches="tight", pad_inches=0, dpi=150)
         plt.close(fig)
 
-        # Delete the uploaded image file after processing
-        os.remove(image_path)
-
         # Count beads per color
         bead_counts = {}
         for row in img_quantized:
             for color in row:
                 color_tuple = tuple(color)
-                if color_tuple not in bead_counts:
-                    bead_counts[color_tuple] = 1
-                else:
-                    bead_counts[color_tuple] += 1
+                bead_counts[color_tuple] = bead_counts.get(color_tuple, 0) + 1
 
         # Prepare color list with counts
-        color_list = [(color, count) for color, count in bead_counts.items()]
-        color_list.sort(key=lambda x: x[1], reverse=True)  # Sort by count
+        color_list = sorted(bead_counts.items(), key=lambda x: x[1], reverse=True)
 
         return render_template("index.html", image_url="uploads/bead_pattern.png", color_list=color_list)
 
@@ -123,7 +125,6 @@ def uploaded_file(filename):
     return send_file(os.path.join(UPLOAD_FOLDER, filename), mimetype="image/png")
 
 def handler(event, context):
-    from flask import request, jsonify
     with app.test_request_context(event['path'], method=event['httpMethod']):
         return app.full_dispatch_request()
 
